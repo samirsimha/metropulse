@@ -2,14 +2,13 @@ from google.transit import gtfs_realtime_pb2
 from google.protobuf.message import DecodeError
 import requests, os, time
 
-feed = gtfs_realtime_pb2.FeedMessage()
-feeds = {
+while True:
+    feed = gtfs_realtime_pb2.FeedMessage()
+    feeds = {
     "trips": "https://metromap.cityofmadison.com/gtfsrt/trips",
     "vehicles": "https://metromap.cityofmadison.com/gtfsrt/vehicles",
     "alerts": "https://metromap.cityofmadison.com/gtfsrt/alerts",
-}
-
-while True:
+    }
     for name, url in feeds.items():
         try:
             response = requests.get(url, timeout=10)
