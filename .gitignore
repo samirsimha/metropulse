@@ -1,6 +1,7 @@
 data/
 *.pb
 *.log
+stop_times.txt
 .env
 .venv/
 __pycache__/
