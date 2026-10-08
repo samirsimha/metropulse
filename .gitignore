@@ -5,3 +5,4 @@ stop_times.txt
 .env
 .venv/
 __pycache__/
+*.csv

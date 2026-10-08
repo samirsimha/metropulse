@@ -18,7 +18,7 @@ for entity in feed.entity:
             arrival_time = stop.arrival.time
         else:
             arrival_time = stop.departure.time
-        prediction[trip_id, stop_sequence] = arrival_time
+        prediction[trip_id, stop_sequence] = (arrival_time, stop.stop_id, entity.trip_update.trip.route_id)
 
 tz = ZoneInfo("America/Chicago")
 local = datetime.fromtimestamp(feed.header.timestamp, tz)
@@ -39,10 +39,20 @@ with open('stop_times.txt', 'r') as file:
         
         stop_id = row['stop_id']
         stop_sequence = row['stop_sequence']
-        schedule[trip_id, int(stop_sequence)] = arrival_time
-    #print(schedule["127020", 34])
-    
-    print(prediction["122010", 34])
-    print(schedule["122010", 34])
-    delay = prediction["122010", 34] - schedule["122010", 34]
-    print(delay)
+        schedule[trip_id, int(stop_sequence)] = (arrival_time, stop_id)
+
+    snapshot_time = feed.header.timestamp
+
+with open('delays_1791156944.csv', 'w', newline='') as out:
+    writer = csv.writer(out)
+    writer.writerow(['snapshot_time', 'trip_id', 'route_id', 'stop_sequence', 'stop_id',
+                     'predicted', 'scheduled', 'delay_s', 'lead_time_s'])
+
+    for key in prediction:
+        if key in schedule and prediction[key][1] == schedule[key][1]:
+            predicted, stop_id, route_id = prediction[key]
+            scheduled = schedule[key][0]
+            writer.writerow([snapshot_time, key[0], route_id, key[1], stop_id,
+                             predicted, scheduled,
+                             predicted - scheduled,
+                             predicted - snapshot_time])
