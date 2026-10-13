@@ -3,10 +3,18 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import csv
 
+
 prediction = {}
 feed = gtfs_realtime_pb2.FeedMessage()
 with open('data_collection/data/raw/trips/1791156944.pb', 'rb') as f:
     feed.ParseFromString(f.read())
+"""
+populating prediction dictionary mapping a trip id and each of its stops (sequence id)
+to its predicted time of arrival (if the trip hasn't arrived at that stop yet)
+or its actual time of arrival (if the trip has arrived at that stop already),
+as well as the id of the stop in the madison metro system and the id of the bus route
+"""
+
 for entity in feed.entity:
     if entity.trip_update.trip.HasField('trip_id'):
         trip_id = entity.trip_update.trip.trip_id
@@ -20,6 +28,10 @@ for entity in feed.entity:
             arrival_time = stop.departure.time
         prediction[trip_id, stop_sequence] = (arrival_time, stop.stop_id, entity.trip_update.trip.route_id)
 
+"""
+populating schedule dictionary mapping every trip id and each of its stops (sequence id)
+to its scheduled time of arrival and the id of the stop
+"""
 tz = ZoneInfo("America/Chicago")
 local = datetime.fromtimestamp(feed.header.timestamp, tz)
 midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)  
@@ -43,6 +55,12 @@ with open('stop_times.txt', 'r') as file:
 
     snapshot_time = feed.header.timestamp
 
+"""
+matches the key (trip id and stop sequence) in prediction dictionary
+to its counterpart in the trip schedule dictionary and then finds the delay
+in predicted/actual time of arrival to the scheduled time of arrival 
+and writes each pair to a csv per snapshot
+"""
 with open('delays_1791156944.csv', 'w', newline='') as out:
     writer = csv.writer(out)
     writer.writerow(['snapshot_time', 'trip_id', 'route_id', 'stop_sequence', 'stop_id',
