@@ -6,7 +6,7 @@ tz = ZoneInfo("America/Chicago")
 
 """
 populating schedule dictionary mapping every trip id and each of its stops (sequence id)
-to its scheduled time of arrival and the id of the stop -- RUNS ONCE
+to its scheduled time of arrival and the id of the stop for a single service day -- RUNS ONCE
 """
 with open('stop_times.txt', 'r') as file:
     reader = csv.DictReader(file)
@@ -18,7 +18,7 @@ with open('stop_times.txt', 'r') as file:
         arrival_time_list = row['arrival_time'].split(':')
         arrival_time = int(arrival_time_list[0]) * 3600 + int(arrival_time_list[1]) * 60 + int(arrival_time_list[2])
 
-        # departure time calculation
+        #departure time calculation
         #departure_time_list = row['departure_time'].split(':')
         #departure_time = int(midnight.timestamp() + int(departure_time_list[0]) * 3600 + int(departure_time_list[1]) * 60 + int(departure_time_list[2]))
         
@@ -50,11 +50,12 @@ with open('delays.csv', 'w', newline='') as out:
                 trip_id = entity.trip_update.trip.modified_trip.affected_trip_id
             for stop in entity.trip_update.stop_time_update:
                 stop_sequence = int(stop.stop_sequence)
-                if stop.HasField('arrival'):
-                    arrival_time = stop.arrival.time
-                else:
-                    arrival_time = stop.departure.time
-                prediction[trip_id, stop_sequence] = (arrival_time, stop.stop_id, entity.trip_update.trip.route_id)
+                if stop.schedule_relationship == gtfs_realtime_pb2.TripUpdate.StopTimeUpdate.SCHEDULED:
+                    if stop.HasField('arrival'):
+                        arrival_time = stop.arrival.time
+                    else:
+                        arrival_time = stop.departure.time
+                    prediction[trip_id, stop_sequence] = (arrival_time, stop.stop_id, entity.trip_update.trip.route_id)
 
         """
         matches the key (trip id and stop sequence) in prediction dictionary
