@@ -1,5 +1,5 @@
 from google.transit import gtfs_realtime_pb2 
-from datetime import datetime   
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import csv, glob
 tz = ZoneInfo("America/Chicago")
@@ -63,14 +63,27 @@ with open('delays.csv', 'w', newline='') as out:
         in predicted/actual time of arrival to the scheduled time of arrival 
         and writes each pair to a csv per snapshot
         """
+
+        # calculating the three proposed midnight timestamps to use
         snapshot_time = feed.header.timestamp
         local = datetime.fromtimestamp(feed.header.timestamp, tz)
-        midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)  
+        today_midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)
+        yest_midnight = today_midnight - timedelta(days=1)
+        tmr_midnight = today_midnight + timedelta(days=1)
+
+        today_midnight = today_midnight.timestamp()
+        yest_midnight = yest_midnight.timestamp()
+        tmr_midnight = tmr_midnight.timestamp()
 
         for key in prediction:
             if key in schedule and prediction[key][1] == schedule[key][1]:
                 predicted, stop_id, route_id = prediction[key]
-                scheduled = int(midnight.timestamp()) + schedule[key][0]
+
+                # calculating which midnight to use for delay calculation
+                best_midnight = min([today_midnight, yest_midnight, tmr_midnight], key=lambda m: abs(predicted - (m + schedule[key][0])))
+
+                #
+                scheduled = int(best_midnight + schedule[key][0])
                 writer.writerow([snapshot_time, key[0], route_id, key[1], stop_id,
                                 predicted, scheduled,
                                 predicted - scheduled,
