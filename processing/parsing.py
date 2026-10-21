@@ -1,6 +1,7 @@
 from google.transit import gtfs_realtime_pb2 
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from google.protobuf.message import DecodeError
 import csv, glob
 tz = ZoneInfo("America/Chicago")
 
@@ -27,15 +28,25 @@ with open('stop_times.txt', 'r') as file:
         schedule[trip_id, int(stop_sequence)] = (arrival_time, stop_id)
 
 files = glob.glob('data_collection/data/raw/trips/*.pb')
+skipped = 0
 with open('delays.csv', 'w', newline='') as out:
     writer = csv.writer(out)
     writer.writerow(['snapshot_time', 'trip_id', 'route_id', 'stop_sequence', 'stop_id',
-                        'predicted', 'scheduled', 'delay_s', 'lead_time_s'])   
+                        'predicted', 'scheduled', 'delay_s', 'lead_time_s', 'service_date'])   
     for file in files:
         feed = gtfs_realtime_pb2.FeedMessage()
         prediction = {}
-        with open(file, 'rb') as f:
-            feed.ParseFromString(f.read())
+        try:
+            with open(file, 'rb') as f:
+                feed.ParseFromString(f.read())
+        except (OSError, DecodeError) as err:
+            print(f"skipping {file}: {err}")
+            skipped += 1
+            continue
+        if feed.header.timestamp == 0:
+            print(f"skipping {file}: empty feed (timestamp 0)")
+            skipped += 1
+            continue
         """
         populating prediction dictionary mapping a trip id and each of its stops (sequence id)
         to its predicted time of arrival (if the trip hasn't arrived at that stop yet)
@@ -75,16 +86,19 @@ with open('delays.csv', 'w', newline='') as out:
         yest_midnight = yest_midnight.timestamp()
         tmr_midnight = tmr_midnight.timestamp()
 
+
         for key in prediction:
             if key in schedule and prediction[key][1] == schedule[key][1]:
                 predicted, stop_id, route_id = prediction[key]
 
                 # calculating which midnight to use for delay calculation
                 best_midnight = min([today_midnight, yest_midnight, tmr_midnight], key=lambda m: abs(predicted - (m + schedule[key][0])))
-
-                #
+                
+                service_date = datetime.fromtimestamp(best_midnight, tz).date()
+                
                 scheduled = int(best_midnight + schedule[key][0])
                 writer.writerow([snapshot_time, key[0], route_id, key[1], stop_id,
                                 predicted, scheduled,
                                 predicted - scheduled,
-                                predicted - snapshot_time])
+                                predicted - snapshot_time, service_date])
+print(f"done: processed {len(files) - skipped} of {len(files)} files, skipped {skipped}")
